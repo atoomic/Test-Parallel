@@ -2,18 +2,57 @@ package Test::Parallel;
 use strict;
 use warnings;
 use Test::More ();
-
-# ABSTRACT: launch your test in parallel
-
-=pod
-=head1 VERSION  0.5
-=cut
-
 use Parallel::ForkManager;
 use Sys::Info;
 
-my @methods = qw{ok is isnt like unlike cmp_ok is_deeply can_ok isa_ok};
+# ABSTRACT: launch your test in parallel
 
+=head1 NAME
+Test::Parallel - simple object interface to launch unit test in parallel
+
+=head1 DESCRIPTION
+
+Test::Parallel is a simple object interface used to launch test in parallel.
+It uses Parallel::ForkManager to launch tests in parallel and get the results.
+
+Alias for basic methods are available
+
+    ok is isnt like unlike cmp_ok is_deeply
+    
+It can be used nearly the same way as Test::More
+
+    use Test::More tests => 8;
+    use Test::Parallel;
+    
+    my $p = Test::Parallel->new();
+    
+    # queue the tests
+    $p->ok( sub { 1 }, "can do ok" );
+    $p->is( sub { 42 }, 42, "can do is" );
+    $p->isnt( sub { 42 }, 51, "can do isnt" );
+    $p->like( sub { "abc" }, qr{ab}, "can do like: match ab");
+    $p->unlike( sub { "abc" }, qr{xy}, "can do unlike: match ab");
+    $p->cmp_ok( sub { 'abc' }, 'eq', 'abc', "can do cmp ok");
+    $p->cmp_ok( sub { '1421' }, '==', 1_421, "can do cmp ok");
+    $p->is_deeply( sub { [ 1..15 ] }, [ 1..15 ], "can do is_deeply");
+
+    # run the tests in background
+    $p->done();
+
+=for Pod::Coverage ok is isnt like unlike cmp_ok is_deeply can_ok isa_ok
+
+=head1 METHODS
+
+=head2 new
+
+Create a new Test::Parallel object
+
+    my $tp = Test::Parallel->new()
+
+=cut
+
+my @methods = qw{ok is isnt like unlike cmp_ok is_deeply can_ok isa_ok};
+ 
 sub new {
     my $self = bless {}, __PACKAGE__;
 
@@ -46,9 +85,20 @@ sub _pfork {
     my $cpu = Sys::Info->new()->device('CPU')->count() || 1;
 
     # we could also set a minimum amount of required memory
-
     $self->{pfork} = new Parallel::ForkManager($cpu);
 }
+
+=head2 $pm->add($code)
+
+You can manually add some code to be launched in parallel,
+but if you uses this method you will need to manipulate yourself the final
+result. 
+
+Prefer using one of the following methods :
+    
+    ok is isnt like unlike cmp_ok is_deeply
+
+=cut
 
 sub add {
     my ( $self, $code, $test ) = @_;
@@ -60,6 +110,13 @@ sub add {
     );
     push( @{ $self->{tests} }, $test );
 }
+
+=head2 $parallel->run()
+
+will run and wait for all jobs added
+you do not need to use this method except if you prefer to add jobs yourself and manipulate the results
+
+=cut
 
 sub run {
     my ($self) = @_;
@@ -101,13 +158,13 @@ sub _add_methods {
     @methods = ();
 }
 
-#
-#sub ok {
-#    my ( $self, $code, @args ) = @_;
-#    $self->add( $code, { test => 'Test::More::ok', args => \@args } );
-#}
+=head2 $tp->done
 
-# run and check results
+    you need to call this function when you are ready to launch all jobs in bg
+    this method will call run and also check results with Test::More
+
+=cut
+
 sub done {
     my ($self) = @_;
 
@@ -135,6 +192,12 @@ sub done {
 
 }
 
+=head2 $tp->results
+
+    get an array of results, in the same order of jobs
+
+=cut
+
 sub results {
     my ($self) = @_;
 
@@ -143,67 +206,19 @@ sub results {
       sort { int($a) <=> int($b) } keys %{ $self->{result} };
     return \@sorted;
 }
+
+=head2 $tp->result
+
+    alias to results
+
+=cut
 {
     no warnings;
     *result = \&results;
 }
 
-# ==== test
-
-#sub p_fork {
-#    # FIXME to improve
-#    return new Parallel::ForkManager(5);
-#}
-
-#sub p_fork {
-#    my $MAX_PROCESS = 4;    #number of your CPUs for example
-#    my $pfm = Parallel::ForkManager->new($MAX_PROCESS);
-#    return $pfm;
-#}
-
-#my $pfm    = p_fork;        #return a Parallel::ForkManager instance
-
-=pod
-my @jobs = qw/task to do in parallel to speedup/;
-
-for my $job (@jobs) {
-    $pfm->start( $job ) and next;
-    
-    my $job_result = compute_this_job($job);
-    my $job_error = ref $job_result eq 'HASH' ? 0 : 1;
-    
-    $pfm->finish( $job_error, $job_result );
-}
-$pfm->wait_all_children;
-
-
-say Dumper($result);
-
-exit;
-=cut
 
 1;
 
 __END__
     
-    # minimum require memory for your process
-    my ($min_mem) = @_; # default 1 Go
-    $min_mem ||= 1024 ** 2; #1 GO => expr in Kb
-    
-    # get number of cpus on the machine
-    my $cpu_info = Sys::Info->new;
-    my $cpu = $cpu_info->device('CPU');
-    my $MAX_PROCESSES_FOR_CPU = $cpu->count || 1;
-    # get real free mem in KB
-    my $freemem = Sys::Statistics::Linux::MemStats->new->get->{realfree};
-    
-    # 3GB by fork max
-    my $MAX_PROCESSES_FOR_MEM = int($freemem / ($min_mem));
-    # get the min between cpu and memory slot, 
-    # 0 mean no fork because not enough memory
-    my $MAX_PROCESSES = 
-          min($MAX_PROCESSES_FOR_CPU, $MAX_PROCESSES_FOR_MEM);
-    # return the process, ready to use
-    my $pm = new Parallel::ForkManager($MAX_PROCESSES);
-    wantarray and return ($pm, $MAX_PROCESSES) or return $pm;
-}
