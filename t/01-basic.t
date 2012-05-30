@@ -1,36 +1,45 @@
 use strict;
 use warnings;
 
-use Test::More tests => 17;
+use Test::More tests => 33;
 
 use_ok 'Test::Parallel';
 
-my $p = Test::Parallel->new();
-isa_ok $p, 'Test::Parallel';
-ok $p->add( sub { 1; } ),        "can add a scalar job";
-ok $p->add( sub { "string"; } ), "can add a string job";
-ok $p->add( sub { { hash => 42 }; } ), "can add a hash job";
-ok $p->add( sub { [ 1 .. 5 ]; } ), "can add an array job";
-ok $p->run(), "can run test in parallel";
+my @tests = (
+    {},
+    { max_process         => 1 },
+    { max_process_per_cpu => 2 }
+);
 
-is_deeply $p->results(),
-  [
-    1, 'string',
-    { 'hash' => 42 },
-    [
-        1,
-        2,
-        3,
-        4,
-        5
-    ]
-  ],
-  "can get results from jobs";
+foreach my $opts (@tests) {
 
-is_deeply $p->result(), $p->results(), "result is an alias on results";
+    my $p = Test::Parallel->new(%$opts);
+    isa_ok $p, 'Test::Parallel', "new with ".join( ' => ', %$opts );
+    ok $p->add( sub { 1; } ),        "can add a scalar job";
+    ok $p->add( sub { "string"; } ), "can add a string job";
+    ok $p->add( sub { { hash => 42 }; } ), "can add a hash job";
+    ok $p->add( sub { [ 1 .. 5 ]; } ), "can add an array job";
+    ok $p->run(), "can run test in parallel";
+
+    is_deeply $p->results(),
+      [
+        1, 'string',
+        { 'hash' => 42 },
+        [
+            1,
+            2,
+            3,
+            4,
+            5
+        ]
+      ],
+      "can get results from jobs";
+
+    is_deeply $p->result(), $p->results(), "result is an alias on results";
+}
 
 # create a new object
-$p = Test::Parallel->new();
+my $p = Test::Parallel->new();
 
 for my $job (qw/a list of jobs to run/) {
     ok $p->add( sub { compute_this_job($job); } ), "can add job $job";
@@ -83,7 +92,10 @@ sub compute_this_job {
     print '- finish job ' . $job . "\n";
 
     # will never stop at the same time
-    return { job => $job, 'your data key for ' . $job => length($job), 'time' => $time };
+    return {
+        job    => $job, 'your data key for ' . $job => length($job),
+        'time' => $time
+    };
 }
 
 exit;

@@ -18,6 +18,8 @@ It uses Parallel::ForkManager to launch tests in parallel and get the results.
 Alias for basic methods are available
 
     ok is isnt like unlike cmp_ok is_deeply
+
+=head1 Usage
     
 It can be used nearly the same way as Test::More
 
@@ -26,7 +28,7 @@ It can be used nearly the same way as Test::More
     
     my $p = Test::Parallel->new();
     
-    # queue the tests
+    # queue some tests that can be parallelized
     $p->ok( sub { 1 }, "can do ok" );
     $p->is( sub { 42 }, 42, "can do is" );
     $p->isnt( sub { 42 }, 51, "can do isnt" );
@@ -45,27 +47,66 @@ It can be used nearly the same way as Test::More
 
 =head2 new
 
-Create a new Test::Parallel object
+Create a new Test::Parallel object.
+By default it will use the number of cores you have as a maximum limit of parallelized job,
+but you can control this value with two options :
+- max_process : set the maximum process to this value
+- max_process_per_cpu : set the maximum process per cpu, this value
+will be multiplied by the number of cpu ( core ) avaiable on your server
 
-    my $tp = Test::Parallel->new()
+    my $p = Test::Parallel->new()
+        or Test::Parallel->new( max_process => N )
+        or Test::Parallel->new( max_process_per_cpu => P )
 
 =cut
 
 my @methods = qw{ok is isnt like unlike cmp_ok is_deeply can_ok isa_ok};
  
 sub new {
+    my ($class, %opts) = @_;
+    
     my $self = bless {}, __PACKAGE__;
 
-    $self->_init();
+    $self->_init(%opts);
 
     return $self;
 }
 
+=head2 ok
+
+Same as Test::More::ok but need a code ref in first argument
+
+=head2 is
+
+Same as Test::More::is but need a code ref in first argument
+
+=head2 isnt
+
+Same as Test::More::isnt but need a code ref in first argument
+
+=head2 like
+
+Same as Test::More::like but need a code ref in first argument
+
+=head2 unlike
+
+Same as Test::More::unlike but need a code ref in first argument
+
+=head2 cmp_ok
+
+Same as Test::More::cmp_ok but need a code ref in first argument
+
+=head2 is_deeply
+
+Same as Test::More::is_deeply but need a code ref in first argument
+
+=cut
+
 sub _init {
-    my ($self) = @_;
+    my ($self, %opts) = @_;
 
     $self->_add_methods();
-    $self->_pfork();
+    $self->_pfork(%opts);
     $self->{result} = {};
     $self->{pfork}->run_on_finish(
         sub {
@@ -80,12 +121,20 @@ sub _init {
 }
 
 sub _pfork {
-    my ($self) = @_;
+    my ($self, %opts) = @_;
 
-    my $cpu = Sys::Info->new()->device('CPU')->count() || 1;
-
+    my $cpu;
+    if ( defined $opts{max_process} ) {
+        $cpu = $opts{max_process};
+    } else {
+        my $factor = $opts{max_process_per_cpu} || 1;    
+        eval {
+            $cpu = Sys::Info->new()->device('CPU')->count() * $factor;
+        };
+    }
+    $cpu ||= 1;
     # we could also set a minimum amount of required memory
-    $self->{pfork} = new Parallel::ForkManager($cpu);
+    $self->{pfork} = new Parallel::ForkManager(int($cpu));
 }
 
 =head2 $pm->add($code)
@@ -111,7 +160,7 @@ sub add {
     push( @{ $self->{tests} }, $test );
 }
 
-=head2 $parallel->run()
+=head2 $p->run
 
 will run and wait for all jobs added
 you do not need to use this method except if you prefer to add jobs yourself and manipulate the results
@@ -158,7 +207,7 @@ sub _add_methods {
     @methods = ();
 }
 
-=head2 $tp->done
+=head2 $p->done
 
     you need to call this function when you are ready to launch all jobs in bg
     this method will call run and also check results with Test::More
@@ -192,7 +241,7 @@ sub done {
 
 }
 
-=head2 $tp->results
+=head2 $p->results
 
     get an array of results, in the same order of jobs
 
@@ -207,7 +256,7 @@ sub results {
     return \@sorted;
 }
 
-=head2 $tp->result
+=head2 $p->result
 
     alias to results
 
