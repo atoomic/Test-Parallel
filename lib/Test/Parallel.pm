@@ -2,6 +2,7 @@ package Test::Parallel;
 use strict;
 use warnings;
 use Test::More ();
+
 # ABSTRACT: launch your test in parallel
 
 =pod
@@ -53,8 +54,10 @@ sub add {
     my ( $self, $code, $test ) = @_;
 
     return unless $code && ref $code eq 'CODE';
-    push( @{ $self->{jobs} },
-        { name => ( scalar( @{ $self->{jobs} } ) + 1 ), code => $code } );
+    push(
+        @{ $self->{jobs} },
+        { name => ( scalar( @{ $self->{jobs} } ) + 1 ), code => $code }
+    );
     push( @{ $self->{tests} }, $test );
 }
 
@@ -66,7 +69,8 @@ sub run {
     for my $job ( @{ $self->{jobs} } ) {
         $pfm->start( $job->{name} ) and next;
         my $job_result = $job->{code}();
-        # can be used to stop on first error 
+
+        # can be used to stop on first error
         my $job_error = 0;
         $pfm->finish( $job_error, { result => $job_result } );
     }
@@ -80,12 +84,12 @@ sub run {
 sub _add_methods {
 
     return unless scalar @methods;
-    
+
     foreach my $sub (@methods) {
         my $accessor = __PACKAGE__ . "::$sub";
-        my $map_to = "Test::More::$sub";
-        next unless defined &{ $map_to };
-        
+        my $map_to   = "Test::More::$sub";
+        next unless defined &{$map_to};
+
         # allow symbolic refs to typeglob
         no strict 'refs';
         *$accessor = sub {
@@ -93,7 +97,7 @@ sub _add_methods {
             $self->add( $code, { test => $map_to, args => \@args } );
         };
     }
-    
+
     @methods = ();
 }
 
@@ -111,23 +115,24 @@ sub done {
     die "Cannot run tests" unless $self->run();
 
     my $c = 0;
+
     # check all results with Test::More
     my $results = $self->results();
     map {
         my $test = $_;
         return unless $test && ref $test eq 'HASH';
         return unless defined $test->{test} && defined $test->{args};
-        
-        die "cannot find result for test ", join(' ', $test->{test}, @{$test->{args}})
-            unless exists $results->[$c]; 
-        my $res = $results->[$c++];
-        my @args = ( $res, @{$test->{args}});
-        my $t = $test->{test};
-        my $str = join(', ', map { "\$args[$_]" } (0..$#args));
-        eval "$t(".$str.")";
-        
+
+        die "cannot find result for test ", join( ' ', $test->{test}, @{ $test->{args} } )
+          unless exists $results->[$c];
+        my $res  = $results->[ $c++ ];
+        my @args = ( $res, @{ $test->{args} } );
+        my $t    = $test->{test};
+        my $str  = join( ', ', map { "\$args[$_]" } ( 0 .. $#args ) );
+        eval "$t(" . $str . ")";
+
     } @{ $self->{tests} };
-    
+
 }
 
 sub results {
