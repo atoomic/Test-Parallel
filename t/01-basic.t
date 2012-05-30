@@ -1,13 +1,38 @@
 use strict;
 use warnings;
 
-use Test::More tests => 10;
+use Test::More tests => 17;
 
 use_ok 'Test::Parallel';
 
 my $p = Test::Parallel->new();
-
 isa_ok $p, 'Test::Parallel';
+ok $p->add( sub { 1; } ), "can add a scalar job";
+ok $p->add( sub { "string"; } ), "can add a string job";
+ok $p->add( sub { {hash => 42}; } ), "can add a hash job";
+ok $p->add( sub { [1..5]; } ), "can add an array job";
+ok $p->run(), "can run test in parallel";
+
+is_deeply $p->results(), [
+          1,
+          'string',
+          {
+            'hash' => 42
+          },
+          [
+            1,
+            2,
+            3,
+            4,
+            5
+          ]
+        ], "can get results from jobs";
+
+is_deeply $p->result(), $p->results(), "result is an alias on results";
+
+# create a new object
+$p = Test::Parallel->new();
+
 
 for my $job (qw/a list of jobs to run/) {
     ok $p->add( sub { compute_this_job($job); } ), "can add job $job";
@@ -15,7 +40,7 @@ for my $job (qw/a list of jobs to run/) {
 
 ok $p->run(), "can run test in parallel";
 
-is_deeply $p->result(), [
+is_deeply $p->results(), [
           {
             'time' => 1,
             'job' => 'a',
