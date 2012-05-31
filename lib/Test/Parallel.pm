@@ -162,6 +162,24 @@ sub _pfork {
         };
     }
     $cpu ||= 1;
+    if ( defined $opts{max_memory}) {
+        my $freemem; 
+        eval {
+            require Sys::Statistics::Linux::MemStats;
+            $freemem = Sys::Statistics::Linux::MemStats->new->get->{realfree};            
+        };
+        my $max_mem = $opts{max_memory} * 1024; # 1024 **2 = 1 GO => expr in Kb
+        my $cpu_for_mem;
+        if ($@) {
+            warn "Cannot guess amount of available free memory need Sys::Statistics::Linux::MemStats";
+            $cpu_for_mem = 2;             
+        } else {
+            $cpu_for_mem = int($freemem / ($max_mem));            
+        }
+        # min
+        $cpu = ( $cpu_for_mem < $cpu ) ? $cpu_for_mem : $cpu;        
+    }    
+    
     # we could also set a minimum amount of required memory
     $self->{pfork} = new Parallel::ForkManager(int($cpu));
 }

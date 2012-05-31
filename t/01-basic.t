@@ -1,14 +1,15 @@
 use strict;
 use warnings;
 
-use Test::More tests => 33;
+use Test::More tests => 41;
 
 use_ok 'Test::Parallel';
 
 my @tests = (
     {},
     { max_process         => 1 },
-    { max_process_per_cpu => 2 }
+    { max_process_per_cpu => 2 },
+    { max_memory          => 128 },
 );
 
 foreach my $opts (@tests) {
