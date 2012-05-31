@@ -90,10 +90,10 @@ will be multiplied by the number of cpu ( core ) avaiable on your server
 =cut
 
 my @methods = qw{ok is isnt like unlike cmp_ok is_deeply can_ok isa_ok};
- 
+
 sub new {
-    my ($class, %opts) = @_;
-    
+    my ( $class, %opts ) = @_;
+
     my $self = bless {}, __PACKAGE__;
 
     $self->_init(%opts);
@@ -132,7 +132,7 @@ Same as Test::More::is_deeply but need a code ref in first argument
 =cut
 
 sub _init {
-    my ($self, %opts) = @_;
+    my ( $self, %opts ) = @_;
 
     $self->_add_methods();
     $self->_pfork(%opts);
@@ -150,38 +150,39 @@ sub _init {
 }
 
 sub _pfork {
-    my ($self, %opts) = @_;
+    my ( $self, %opts ) = @_;
 
     my $cpu;
     if ( defined $opts{max_process} ) {
         $cpu = $opts{max_process};
-    } else {
-        my $factor = $opts{max_process_per_cpu} || 1;    
-        eval {
-            $cpu = Sys::Info->new()->device('CPU')->count() * $factor;
-        };
     }
-    $cpu ||= 1;
-    if ( defined $opts{max_memory}) {
-        my $freemem; 
+    else {
+        my $factor = $opts{max_process_per_cpu} || 1;
+        eval { $cpu = Sys::Info->new()->device('CPU')->count() * $factor; };
+    }
+    if ( defined $opts{max_memory} ) {
+        my $free_mem;
         eval {
             require Sys::Statistics::Linux::MemStats;
-            $freemem = Sys::Statistics::Linux::MemStats->new->get->{realfree};            
+            $free_mem = Sys::Statistics::Linux::MemStats->new->get->{realfree};
         };
-        my $max_mem = $opts{max_memory} * 1024; # 1024 **2 = 1 GO => expr in Kb
+        my $max_mem = $opts{max_memory} * 1024;    # 1024 **2 = 1 GO => expr in Kb
         my $cpu_for_mem;
         if ($@) {
             warn "Cannot guess amount of available free memory need Sys::Statistics::Linux::MemStats";
-            $cpu_for_mem = 2;             
-        } else {
-            $cpu_for_mem = int($freemem / ($max_mem));            
+            $cpu_for_mem = 2;
         }
+        else {
+            $cpu_for_mem = int( $free_mem / $max_mem );
+        }
+
         # min
-        $cpu = ( $cpu_for_mem < $cpu ) ? $cpu_for_mem : $cpu;        
-    }    
-    
+        $cpu = ( $cpu_for_mem < $cpu ) ? $cpu_for_mem : $cpu;
+    }
+    $cpu ||= 1;
+
     # we could also set a minimum amount of required memory
-    $self->{pfork} = new Parallel::ForkManager(int($cpu));
+    $self->{pfork} = new Parallel::ForkManager( int($cpu) );
 }
 
 =head2 $pm->add($code)
@@ -275,17 +276,20 @@ sub done {
         my $test = $_;
         return unless $test;
         die "cannot find result for test #${c}" unless exists $results->[$c];
-        my $res  = $results->[ $c++ ];
-        
-        if (ref $test eq 'HASH') {
-            # internal mechanism            
+        my $res = $results->[ $c++ ];
+
+        if ( ref $test eq 'HASH' ) {
+
+            # internal mechanism
             return unless defined $test->{test} && defined $test->{args};
-    
+
             my @args = ( $res, @{ $test->{args} } );
             my $t    = $test->{test};
             my $str  = join( ', ', map { "\$args[$_]" } ( 0 .. $#args ) );
             eval "$t(" . $str . ")";
-        } elsif ( ref $test eq 'CODE' ) {
+        }
+        elsif ( ref $test eq 'CODE' ) {
+
             # execute user function
             $test->($res);
         }
@@ -314,11 +318,11 @@ sub results {
     alias to results
 
 =cut
+
 {
     no warnings;
     *result = \&results;
 }
-
 
 1;
 

@@ -15,7 +15,7 @@ my @tests = (
 foreach my $opts (@tests) {
 
     my $p = Test::Parallel->new(%$opts);
-    isa_ok $p, 'Test::Parallel', "new with ".join( ' => ', %$opts );
+    isa_ok $p, 'Test::Parallel', "new with " . join( ' => ', %$opts );
     ok $p->add( sub { 1; } ),        "can add a scalar job";
     ok $p->add( sub { "string"; } ), "can add a string job";
     ok $p->add( sub { { hash => 42 }; } ), "can add a hash job";
