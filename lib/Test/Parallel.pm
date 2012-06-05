@@ -85,7 +85,7 @@ will be multiplied by the number of cpu ( core ) avaiable on your server
     my $p = Test::Parallel->new()
         or Test::Parallel->new( max_process => N )
         or Test::Parallel->new( max_process_per_cpu => P )
-        or Test::Parallel->new( max_memory => M )
+        or Test::Parallel->new( max_memory => M );
 
 =cut
 
