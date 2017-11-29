@@ -10,9 +10,11 @@ environment:
 install:
   - 'call appveyor.cmd perl_setup'
   - '%perl% -V'
-  - '%cpanm% --installdeps -n --with-develop --with-recommends .'
+  - '%cpanm% -n Dist::Zilla'
+  - 'dzil authordeps --missing | cpanm -n'
+  - 'dzil listdeps --missing | cpanm -n'
 
 build: off
 
 test_script:
-  - 'prove -l t'
+  - dzil test -v
